@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to
+-We will make a boiler plate code for ar based web applications.
+-we will update the code and technology 
+-Learn about different models
+-Implement ar shoe try on app
+-Create a progress.md to record our progress
+-Update the README.md file about the project structure

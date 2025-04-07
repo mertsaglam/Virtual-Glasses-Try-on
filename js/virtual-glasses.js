@@ -1,6 +1,6 @@
-import * as THREE from '../node_modules/three/build/three.module.js';
-import {OrbitControls} from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
-import {GLTFLoader} from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from '/node_modules/three/build/three.module.js';
+import {OrbitControls} from '/node_modules/three/examples/jsm/controls/OrbitControls.js';
+import {GLTFLoader} from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
 const webcamElement = document.getElementById('webcam');
 const canvasElement = document.getElementById('canvas');
@@ -18,11 +18,25 @@ let camera;
 let renderer;
 let obControls;
 let glassesKeyPoints = {midEye:168, leftEye:143, noseBottom:2, rightEye:372};
+let showFaceMesh = false;
+let faceMeshObject = null;
+let faceMeshGeometry = null;
 
 $( document ).ready(function() {
     setup3dScene();
     setup3dCamera();
     setup3dGlasses();
+    setupFaceMeshObject();
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 'd') {
+            showFaceMesh = !showFaceMesh;
+            console.log("Face mesh visibility:", showFaceMesh);
+            if (faceMeshObject) {
+                faceMeshObject.visible = showFaceMesh;
+            }
+        }
+    });
 });
 
 $("#webcam-switch").change(function () {
@@ -86,24 +100,36 @@ $('#closeError').click(function() {
     $("#webcam-switch").prop('checked', false).change();
 });
 
+function setupFaceMeshObject() {
+    faceMeshGeometry = new THREE.BufferGeometry();
+    const material = new THREE.PointsMaterial({
+        color: 0x00ff00,
+        size: 1.5,
+        sizeAttenuation: false
+    });
+    faceMeshObject = new THREE.Points(faceMeshGeometry, material);
+    faceMeshObject.visible = showFaceMesh;
+    scene.add(faceMeshObject);
+}
+
 async function startVTGlasses() {
     return new Promise((resolve, reject) => {
         $(".loading").removeClass('d-none');
-        faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh).then(mdl => { 
-            model = mdl;            
+        faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh).then(mdl => {
+            model = mdl;
             console.log("model loaded");
             if(isVideo && webcam.facingMode == 'user'){
                 detectFace = true;
             }
-            
+
             cameraFrame =  detectFaces().then(() => {
                 $(".loading").addClass('d-none');
                 resolve();
-            }); 
+            });
         })
         .catch(err => {
             displayError('Fail to load face mesh model<br/>Please refresh the page to try again');
-            reject(error);
+            reject(err);
         });
     });
 }
@@ -111,7 +137,7 @@ async function startVTGlasses() {
 async function detectFaces() {
     let inputElement = webcamElement;
     let flipHorizontal = !isVideo;
-    
+
     await model.estimateFaces
     ({
         input: inputElement,
@@ -119,7 +145,6 @@ async function detectFaces() {
         flipHorizontal: flipHorizontal,
         predictIrises: false
     }).then(faces => {
-        //console.log(faces);
         drawglasses(faces).then(() => {
             if(clearglasses){
                 clearCanvas();
@@ -133,12 +158,30 @@ async function detectFaces() {
 }
 
 async function drawglasses(faces){
+    let faceDetected = faces.length > 0;
+
     if(isVideo && (glassesArray.length != faces.length) ){
         clearCanvas();
         for (let j = 0; j < faces.length; j++) {
             await setup3dGlasses();
         }
-    }   
+    }
+
+    if (faceDetected && faceMeshObject) {
+        const face = faces[0];
+        const positions = [];
+        if (face.scaledMesh) {
+            const estimatedZ = -camera.position.z;
+            for (const point of face.scaledMesh) {
+                positions.push(point[0], -point[1], estimatedZ + point[2]);
+            }
+            faceMeshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            faceMeshGeometry.attributes.position.needsUpdate = true;
+        }
+        faceMeshObject.visible = showFaceMesh;
+    } else if (faceMeshObject) {
+        faceMeshObject.visible = false;
+    }
 
     for (let i = 0; i < faces.length; i++) {
         let glasses = glassesArray[i];
@@ -173,21 +216,18 @@ async function drawglasses(faces){
 
             glasses.rotation.y = Math.PI;
             glasses.rotation.z = Math.PI / 2 - Math.acos( glasses.up.x );
-            
-            renderer.render(scene, camera);
         }
     }
+    renderer.render(scene, camera);
 }
 
-
 function clearCanvas(){
-    for( var i = scene.children.length - 1; i >= 0; i--) { 
+    for( var i = scene.children.length - 1; i >= 0; i--) {
         var obj = scene.children[i];
         if(obj.type=='Group'){
             scene.remove(obj);
         }
     }
-    renderer.render(scene, camera);
     glassesArray = [];
 }
 
@@ -212,7 +252,6 @@ function setup3dScene(){
         canvas: canvasElement,
         alpha: true
     });
-    //light
     var frontLight = new THREE.SpotLight( 0xffffff, 0.3 );
     frontLight.position.set( 10, 10, 10 );
     scene.add( frontLight );
