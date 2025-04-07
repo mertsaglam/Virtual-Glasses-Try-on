@@ -13,23 +13,27 @@
       text-align: center;
       color: white;
       font-family: Arial, sans-serif;
-      pointer-events: none;
+      /* pointer-events: none; */
     }
   </style>
 </head>
 <body>
-  <div id="info">GLB Model Viewer - Orbit controls: Left-click to rotate, Right-click to pan, Scroll to zoom</div>
-  
+    <div id="info">
+        GLB Model Viewer - Orbit controls: Left-click to rotate, Right-click to pan, Scroll to zoom<br>
+        Press 'W' to toggle wireframe mode, 'A' to toggle axes helper
+      </div>  
   <script type="importmap">
   {
     "imports": {
       "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
       "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.156.1/examples/jsm/controls/OrbitControls.js",
       "three/examples/jsm/loaders/GLTFLoader.js": "https://unpkg.com/three@0.156.1/examples/jsm/loaders/GLTFLoader.js",
-      "three/examples/jsm/loaders/DRACOLoader.js": "https://unpkg.com/three@0.156.1/examples/jsm/loaders/DRACOLoader.js"
+      "three/examples/jsm/loaders/DRACOLoader.js": "https://unpkg.com/three@0.156.1/examples/jsm/loaders/DRACOLoader.js",
+      "three/examples/jsm/libs/lil-gui.module.min.js": "https://unpkg.com/three@0.156.1/examples/jsm/libs/lil-gui.module.min.js"
     }
   }
   </script>
+
   <script type="module" src="js/glb-viewer.js"></script>
 </body>
 </html>
