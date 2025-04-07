@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 const webcamElement = document.getElementById('webcam');
 const canvasElement = document.getElementById('canvas');
@@ -19,8 +21,7 @@ let renderer;
 let obControls;
 let glassesKeyPoints = {midEye:168, leftEye:143, noseBottom:2, rightEye:372};
 let showFaceMesh = false;
-let faceMeshObject = null;
-let faceMeshGeometry = null;
+let faceMeshObjects = [];
 
 $( document ).ready(function() {
     setup3dScene();
@@ -32,9 +33,7 @@ $( document ).ready(function() {
         if (event.key.toLowerCase() === 'd') {
             showFaceMesh = !showFaceMesh;
             console.log("Face mesh visibility:", showFaceMesh);
-            if (faceMeshObject) {
-                faceMeshObject.visible = showFaceMesh;
-            }
+            faceMeshObjects.forEach(obj => obj.visible = showFaceMesh);
         }
     });
 });
@@ -101,15 +100,7 @@ $('#closeError').click(function() {
 });
 
 function setupFaceMeshObject() {
-    faceMeshGeometry = new THREE.BufferGeometry();
-    const material = new THREE.PointsMaterial({
-        color: 0x00ff00,
-        size: 1.5,
-        sizeAttenuation: false
-    });
-    faceMeshObject = new THREE.Points(faceMeshGeometry, material);
-    faceMeshObject.visible = showFaceMesh;
-    scene.add(faceMeshObject);
+    // Remove or comment out single faceMeshObject creation
 }
 
 async function startVTGlasses() {
@@ -137,14 +128,16 @@ async function startVTGlasses() {
 async function detectFaces() {
     let inputElement = webcamElement;
     let flipHorizontal = !isVideo;
+    console.log("input element", inputElement);
 
     await model.estimateFaces
     ({
         input: inputElement,
         returnTensors: false,
         flipHorizontal: flipHorizontal,
-        predictIrises: false
+        predictIrises: true
     }).then(faces => {
+        console.log("Detected faces:", faces); // Log the detected faces
         drawglasses(faces).then(() => {
             if(clearglasses){
                 clearCanvas();
@@ -167,20 +160,32 @@ async function drawglasses(faces){
         }
     }
 
-    if (faceDetected && faceMeshObject) {
-        const face = faces[0];
-        const positions = [];
-        if (face.scaledMesh) {
-            const estimatedZ = -camera.position.z;
-            for (const point of face.scaledMesh) {
-                positions.push(point[0], -point[1], estimatedZ + point[2]);
-            }
-            faceMeshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            faceMeshGeometry.attributes.position.needsUpdate = true;
+    // Clear previously created faces if count changes
+    if(faceMeshObjects.length !== faces.length){
+        faceMeshObjects.forEach(obj => scene.remove(obj));
+        faceMeshObjects = [];
+        // Create new mesh objects for each face
+        for(let i=0; i<faces.length; i++){
+            let geometry = new THREE.BufferGeometry();
+            let material = new THREE.PointsMaterial({color:0x00ff00,size:1.5,sizeAttenuation:false});
+            let meshObj = new THREE.Points(geometry, material);
+            meshObj.visible = showFaceMesh;
+            faceMeshObjects.push(meshObj);
+            scene.add(meshObj);
         }
-        faceMeshObject.visible = showFaceMesh;
-    } else if (faceMeshObject) {
-        faceMeshObject.visible = false;
+    }
+
+    // Update each face's mesh positions
+    for(let i=0; i<faces.length; i++){
+        let positions = [];
+        const estimatedZ = -camera.position.z;
+        for(const point of faces[i].scaledMesh){
+            positions.push(point[0], -point[1], estimatedZ + point[2]);
+        }
+        faceMeshObjects[i].geometry.setAttribute('position',
+            new THREE.Float32BufferAttribute(positions, 3));
+        faceMeshObjects[i].geometry.attributes.position.needsUpdate = true;
+        faceMeshObjects[i].visible = showFaceMesh;
     }
 
     for (let i = 0; i < faces.length; i++) {
@@ -193,9 +198,13 @@ async function drawglasses(faces){
             let pointNoseBottom = face.scaledMesh[ glassesKeyPoints.noseBottom ];
             let pointrightEye = face.scaledMesh[ glassesKeyPoints.rightEye ];
 
-            glasses.position.x = pointMidEye[ 0 ];
-            glasses.position.y = -pointMidEye[ 1 ] + parseFloat(selectedglasses.attr("data-3d-up"));
-            glasses.position.z = -camera.position.z + pointMidEye[ 2 ];
+            glasses.position.x = pointMidEye[0] + parseFloat(selectedglasses.attr("data-3d-x") || 0);
+            glasses.position.y = -pointMidEye[1] 
+                + parseFloat(selectedglasses.attr("data-3d-up") || 0)
+                + parseFloat(selectedglasses.attr("data-3d-y") || 0);
+            glasses.position.z = -camera.position.z 
+                + pointMidEye[2] 
+                + parseFloat(selectedglasses.attr("data-3d-z") || 0);
 
             glasses.up.x = pointMidEye[ 0 ] - pointNoseBottom[ 0 ];
             glasses.up.y = -( pointMidEye[ 1 ] - pointNoseBottom[ 1 ] );
@@ -297,8 +306,11 @@ function setup3dCamera(){
 async function setup3dGlasses(){
     return new Promise(resolve => {
         var threeType = selectedglasses.attr("data-3d-type");
+        var gltfLoader = new GLTFLoader();
+        var dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://unpkg.com/three@0.156.1/examples/jsm/libs/draco/');
+        gltfLoader.setDRACOLoader(dracoLoader);
         if(threeType == 'gltf'){
-            var gltfLoader = new GLTFLoader();
             gltfLoader.setPath(selectedglasses.attr("data-3d-model-path"));
             gltfLoader.load( selectedglasses.attr("data-3d-model"), function ( object ) {
                 object.scene.position.set(selectedglasses.attr("data-3d-x"), selectedglasses.attr("data-3d-y"), selectedglasses.attr("data-3d-z"));
@@ -310,6 +322,29 @@ async function setup3dGlasses(){
                 scene.add( object.scene );
                 glassesArray.push(object.scene);
                 resolve('loaded');        
+            });
+        }
+        else if(threeType === 'glb'){
+            gltfLoader.setPath(selectedglasses.attr("data-3d-model-path"));
+            gltfLoader.load(selectedglasses.attr("data-3d-model"), function ( object ) {
+                object.scene.position.set(selectedglasses.attr("data-3d-x"), selectedglasses.attr("data-3d-y"), selectedglasses.attr("data-3d-z"));
+                var scale = selectedglasses.attr("data-3d-scale");
+                if(window.innerWidth < 480){
+                    scale = scale * 0.5;
+                }
+                object.scene.scale.set(scale, scale,scale);
+                scene.add( object.scene );
+                glassesArray.push(object.scene);
+                resolve('loaded');        
+            });
+        }
+        else if(threeType === 'exr'){
+            let exrLoader = new EXRLoader();
+            exrLoader.setPath(selectedglasses.attr("data-3d-model-path"));
+            exrLoader.load(selectedglasses.attr("data-3d-model"), function ( texture ) {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.environment = texture;
+                resolve('loaded');
             });
         }
     });
