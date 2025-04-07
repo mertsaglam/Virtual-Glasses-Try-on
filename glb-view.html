@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLB Model Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-family: Arial, sans-serif;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">GLB Model Viewer - Orbit controls: Left-click to rotate, Right-click to pan, Scroll to zoom</div>
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.156.1/build/three.module.js",
+      "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.156.1/examples/jsm/controls/OrbitControls.js",
+      "three/examples/jsm/loaders/GLTFLoader.js": "https://unpkg.com/three@0.156.1/examples/jsm/loaders/GLTFLoader.js",
+      "three/examples/jsm/loaders/DRACOLoader.js": "https://unpkg.com/three@0.156.1/examples/jsm/loaders/DRACOLoader.js"
+    }
+  }
+  </script>
+  <script type="module" src="js/glb-viewer.js"></script>
+</body>
+</html>
